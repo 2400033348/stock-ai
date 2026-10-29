@@ -1,0 +1,26 @@
+Diagnostics for Version 2, 20-day label. Test period 2018-01-01 to 2025-09-15, 45 stocks.
+95% intervals come from a block bootstrap (blocks of consecutive values), so serial correlation is respected.
+If an interval contains zero, the result cannot be told apart from chance.
+
+=== Logistic Regression ===
+Mean IC per day: +0.0168   95% interval [-0.0120, +0.0441]   -> INCLUDES zero
+Net excess vs universe per month: -0.209%   95% interval [-0.676%, +0.237%]   -> INCLUDES zero
+   gross excess -0.042%   turnover cost 0.167%   net excess -0.209%   (per month)
+Sharpe (annualised):  portfolio 0.89   universe 1.11   NIFTY 0.73   excess (information ratio) -0.31
+Worst drop inside each year (portfolio / universe, %):  2018: -6.9/-9.5  2019: -4.1/-6.2  2020: -29.4/-26.6  2021: -5.0/-4.2  2022: -19.0/-11.3  2023: -4.2/-1.9  2024: -18.6/-11.4  2025: -4.1/-2.4
+
+=== XGBoost classifier ===
+Mean IC per day: +0.0220   95% interval [-0.0073, +0.0527]   -> INCLUDES zero
+Net excess vs universe per month: -0.135%   95% interval [-0.673%, +0.454%]   -> INCLUDES zero
+   gross excess +0.039%   turnover cost 0.174%   net excess -0.135%   (per month)
+Sharpe (annualised):  portfolio 0.88   universe 1.11   NIFTY 0.73   excess (information ratio) -0.20
+Worst drop inside each year (portfolio / universe, %):  2018: -13.3/-9.5  2019: -5.9/-6.2  2020: -29.9/-26.6  2021: -6.2/-4.2  2022: -17.1/-11.3  2023: -4.1/-1.9  2024: -17.7/-11.4  2025: -4.1/-2.4
+
+=== XGBoost ranker ===
+Mean IC per day: +0.0141   95% interval [-0.0095, +0.0405]   -> INCLUDES zero
+Net excess vs universe per month: -0.235%   95% interval [-0.670%, +0.194%]   -> INCLUDES zero
+   gross excess -0.047%   turnover cost 0.188%   net excess -0.235%   (per month)
+Sharpe (annualised):  portfolio 0.83   universe 1.11   NIFTY 0.73   excess (information ratio) -0.36
+Worst drop inside each year (portfolio / universe, %):  2018: -11.0/-9.5  2019: -6.2/-6.2  2020: -31.3/-26.6  2021: -7.0/-4.2  2022: -16.9/-11.3  2023: -1.9/-1.9  2024: -12.1/-11.4  2025: -2.7/-2.4
+
+Reading guide: an information ratio below about 0.5 with an interval that includes zero is not evidence of a tradable edge. The universe is made of today's surviving large caps, so its returns are flattering.

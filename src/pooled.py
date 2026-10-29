@@ -1,28 +1,16 @@
-"""
-Experiment 3: ONE model trained on many stocks together (relative label, same 16 features).
 
-Run from the project folder (after labels_rel.py, and after build_universe.py for 3b):
-    python src/pooled.py 5      Experiment 3a: the original 5 stocks, one pooled model
-    python src/pooled.py all    Experiment 3b: every stock that has a *_dataset_rel.parquet file
-
-Walk-forward, same rules as before:
-  * Only DEV data (up to 14 Oct 2025, minus the last 5 rows). The locked final period is never read.
-  * For each test year Y (2018 ...): train on ALL stocks' rows before Jan 1 of Y
-    (dropping the last 5 rows of each stock for the embargo), predict year Y for all stocks.
-Writes results/walk_forward_predictions_pooled_<5|all>.csv
-"""
 import sys
 from pathlib import Path
-
+ 
 import numpy as np
 import pandas as pd
-
+ 
 from model import (FIRST_TEST_YEAR, HORIZON, MIN_TRAIN_ROWS, NON_FEATURES, PROC_DIR,
                    RES_DIR, calibration_table, dev_data, make_models, safe_auc)
-
+ 
 CORE5 = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"]
-
-
+ 
+ 
 def load_dev(names):
     out = {}
     for n in names:
@@ -30,9 +18,9 @@ def load_dev(names):
         if p.exists():
             out[n] = dev_data(pd.read_parquet(p))
     return out
-
-
-def walk_forward_pooled(dev_by_stock, first_year=FIRST_TEST_YEAR):
+ 
+ 
+def walk_forward_pooled(dev_by_stock, first_year=FIRST_TEST_YEAR, feature_cols=None):
     last_year = max(d.index.year.max() for d in dev_by_stock.values())
     parts = []
     for year in range(first_year, last_year + 1):
@@ -41,18 +29,18 @@ def walk_forward_pooled(dev_by_stock, first_year=FIRST_TEST_YEAR):
         test = pd.concat([d[d.index.year == year].assign(stock=n) for n, d in dev_by_stock.items()])
         if len(train) < MIN_TRAIN_ROWS or test.empty:
             continue
-        feature_cols = [c for c in train.columns if c not in NON_FEATURES]
+        cols = feature_cols or [c for c in train.columns if c not in NON_FEATURES]
         out = pd.DataFrame({"y": test.y, "fwd_ret": test.fwd_ret, "excess_ret": test.excess_ret,
                             "mom5": test.ret_5, "stock": test.stock}, index=test.index)
         for name, model in make_models().items():
-            model.fit(train[feature_cols], train.y)
-            out[f"prob_{name}"] = model.predict_proba(test[feature_cols])[:, 1]
+            model.fit(train[cols], train.y)
+            out[f"prob_{name}"] = model.predict_proba(test[cols])[:, 1]
         parts.append(out)
         print(f"  {year}: trained on {len(train)} rows from {len(dev_by_stock)} stocks, "
               f"tested on {len(test)}", flush=True)
     return pd.concat(parts).sort_index() if parts else pd.DataFrame()
-
-
+ 
+ 
 def spread_table(pred, col):
     """Each day: rank the stocks by prediction; compare the top fifth with the bottom fifth."""
     rows = []
@@ -67,14 +55,14 @@ def spread_table(pred, col):
     t["top_vs_all"] = t.top - t["all"]
     t["spread"] = t.top - t.bottom
     return t
-
-
+ 
+ 
 def report(pred):
     models = [("Random Forest", "prob_rf"), ("XGBoost", "prob_xgb"), ("Momentum (ret_5)", "mom5")]
     n_stocks = pred.stock.nunique()
     print(f"\nStocks in the test: {n_stocks}   rows: {len(pred)}   "
           f"share label = 1: {100 * pred.y.mean():.1f}%")
-
+ 
     print("\n=== AUC by test year (0.50 = no skill) ===")
     print(f"{'Year':<6}{'Rows':>8}" + "".join(f"{n:>20}" for n, _ in models))
     for year, g in pred.groupby(pred.index.year):
@@ -83,12 +71,12 @@ def report(pred):
     for _, c in models[:2]:
         per_year = pred.groupby(pred.index.year).apply(lambda g: safe_auc(g.y, g[c]))
         print(f"   {c}: years with AUC above 0.53: {int((per_year > 0.53).sum())} of {len(per_year)}")
-
+ 
     if n_stocks > 6:
         st_auc = pred.groupby("stock").apply(lambda g: safe_auc(g.y, g.prob_rf)).dropna()
         print(f"\nRandom Forest AUC per stock: mean {st_auc.mean():.3f}, min {st_auc.min():.3f}, "
               f"max {st_auc.max():.3f}, stocks above 0.50: {int((st_auc > 0.5).sum())} of {len(st_auc)}")
-
+ 
     for name, col in models[:2]:
         print(f"\n=== Calibration: {name} ===")
         print(calibration_table(pred.y, pred[col]).round(3).to_string())
@@ -99,7 +87,7 @@ def report(pred):
             print(f"   Average 5-day return vs NIFTY on these signals: {100 * hi.excess_ret.mean():+.3f}%  "
                   f"(all rows: {100 * pred.excess_ret.mean():+.3f}%)  "
                   f"-> advantage {100 * (hi.excess_ret.mean() - pred.excess_ret.mean()):+.3f}% per 5 days, before costs")
-
+ 
         t = spread_table(pred, col)
         if not t.empty:
             print(f"Top fifth vs bottom fifth of stocks each day ({name}), average 5-day return vs NIFTY:")
@@ -111,8 +99,8 @@ def report(pred):
             print("   " + "   ".join(f"{y}: {r.top_vs_all:+.2f}/{r.spread:+.2f}" for y, r in by_year.iterrows()))
     print("\nBar set in advance: AUC > 0.53 in at least 5 of 8 years, and an advantage of at least "
           "+0.30% per 5 days before costs.")
-
-
+ 
+ 
 def main():
     which = sys.argv[1] if len(sys.argv) > 1 else "5"
     if which == "5":
@@ -135,7 +123,7 @@ def main():
           "(locked final period NOT used)")
     report(pred)
     print(f"\nPredictions saved to {out}")
-
-
+ 
+ 
 if __name__ == "__main__":
     main()

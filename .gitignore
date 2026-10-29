@@ -1,3 +1,4 @@
 .venv/
 data/
 __pycache__/
+results/walk_forward_predictions*.csv

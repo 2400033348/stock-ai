@@ -44,3 +44,38 @@
 - Likely a very small real signal (about 0.51), far below the 0.30% round-trip cost
 - Survivorship bias in the 45-stock list flatters the result
 - Locked period: not used
+## Experiment 4 result (27 Oct 2026)
+- 4a rank features: AUC RF 0.510, XGB 0.508, 0 of 8 years above 0.53
+- 4b ranks + NIFTY market features: AUC RF 0.509, XGB 0.508, 0 of 8 years above 0.53
+- Top fifth vs all: +0.06% to +0.08% per 5 days (positive in 7 of 8 years in 4a), cost is 0.30%
+- Bar NOT met. Market features added nothing
+- Conclusion: the 16 features carry about 0.51 AUC regardless of representation
+- Locked period: not used
+## Experiment 5 result (27 Oct 2026)
+- 10-day label: AUC RF 0.505, XGB 0.503, 0 of 8 years above 0.53, advantage -0.09% / -0.16% per 10 days
+- 20-day label: AUC RF 0.495, XGB 0.497, advantage -0.20% / -0.24% per 20 days, non-overlapping AUC below 0.50
+- Bar NOT met. The signal fades with horizon instead of growing
+- Overall (Experiments 1-5): 8 set-ups, AUC 0.495 to 0.523, no consistent edge, best effect under 0.1% per 5 days vs 0.30% cost
+- DECISION: stop model experiments. Nothing passed, so no model is frozen and the locked period stays unopened
+- Locked period: not used
+## Experiment 6: Version 2 (31 features incl. long momentum, breadth, NIFTY regime; ranks; Logistic, XGBoost, XGBoost ranker; 20-day relative label; top-10 monthly portfolio, 0.30% cost per replaced stock)
+Result: AUC 0.510 / 0.509 / 0.507; years above 0.53: 2 / 2 / 1 of 8. Mean IC +0.017 / +0.022 / +0.014.
+Top-10 net excess over the equal-weight universe: -0.21% / -0.14% / -0.24% per month.
+Verdict: bar NOT met. No evidence of a tradable edge. Locked period still unopened.
+## Experiment 8: Version 2 plus outside-market information (29 Oct 2026, src/exp8.py)
+- Added S&P 500, USD/INR, Brent crude and US VIX changes (lagged one step so they were known before India's close) and 60-day betas to NIFTY, USD/INR and crude. 42 features in total.
+- AUC 0.507 / 0.508 / 0.507; years above 0.53: 2 / 2 / 0 of 8. Mean IC +0.011 / +0.018 / +0.014.
+- Net excess vs equal-weight universe: -0.26% / -0.19% / -0.42% per month; information ratio -0.40 / -0.28 / -0.68.
+- All 95% block-bootstrap intervals include zero. Gross excess -0.11% / -0.02% / -0.23% per month.
+- Verdict: bar NOT met; slightly worse than Experiment 6. Locked period: not used.
+- Final conclusion: no tradable edge found from price, volume, market regime or outside-market data (FII/DII flows not tested, no free source).
+## Experiment 9: US small caps (29 Oct 2026, src/exp9.py)
+- S&P SmallCap 600 (100 most liquid with history before 2014), benchmark IWM, 20-day label, cost 0.40%.
+- AUC 0.495 / 0.492 / 0.502; years above 0.53: 1 / 0 / 0 of 8. Mean IC +0.007 / +0.005 / +0.009 (intervals include zero).
+- Net excess vs universe: -0.87% / +0.22% / +1.04% per month. Ranker positive in 6 of 8 years but interval [-0.34%, +2.62%] includes zero.
+- Verdict: bar NOT met (AUC and interval parts failed). Result driven mainly by 2020; best of three models chosen after the fact; survivorship bias severe. Locked period: not used.
+## Experiment 9b: baseline check (29 Oct 2026, src/check_exp9.py)
+- Ranker +1.04% per month vs "10 most volatile stocks" +2.48% (positive in 8 of 8 years) vs random 95th percentile +0.29%.
+- Ranker picks had average volatility rank 0.71; without 2020 the ranker falls to +0.43%.
+- Verdict: ranker adds no value beyond a simple rule. The volatility result contradicts the literature and is most likely an artifact of survivorship bias and of selecting stocks by recent dollar volume (look-ahead). Experiment 9 is not trusted. Locked period: not used.
+- Lesson: a good-looking backtest in a survivor-only universe is a warning sign, not a finding.
