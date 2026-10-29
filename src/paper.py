@@ -1,10 +1,10 @@
 """
 Paper trading for the Version 2 models on NSE large caps. No real money, no orders: it only records and scores picks.
-
+ 
 Run from the project folder (venv active, internet needed):
     python src/paper.py signal     every 20 trading days: refresh data, retrain, record the top-10 picks per model
     python src/paper.py score      any time: score every finished holding period from the ledger
-
+ 
 Rules (fixed in advance, do not change them after seeing results):
   * Models: Logistic Regression, XGBoost classifier, XGBoost ranker (same settings as Version 2), trained on ALL rows whose
     20-day label is already known on the signal day. Same 31 features as Experiment 6.
@@ -18,38 +18,39 @@ Files: paper/ledger.csv (picks), paper/score.csv (results).
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-
+ 
 import numpy as np
 import pandas as pd
-
+ 
 import v2
 from features import make_features
 from horizon import make_label_h
-
+ 
 H, K, COST = 20, 10, 0.003
 PAPER = Path("paper")
 LEDGER, SCORE = PAPER / "ledger.csv", PAPER / "score.csv"
 MODELS = [("Logistic Regression", "s_logit"), ("XGBoost classifier", "s_xgb"), ("XGBoost ranker", "s_rank")]
-
-
+ 
+ 
 def stock_names():
-    return sorted(p.stem for p in Path("data/raw").glob("*.parquet") if p.stem != "NIFTY")
-
-
+    return sorted(p.stem for p in Path("data/raw").glob("*.parquet")
+                  if p.stem != "NIFTY" and not p.stem.startswith("EXT_"))
+ 
+ 
 IST = timezone(timedelta(hours=5, minutes=30))
-
-
+ 
+ 
 def drop_unfinished_day(df, now=None):
     """Before 4 pm India time, today's candle is unfinished (or missing): never use it as a close."""
     now = now or datetime.now(IST)
     if now.hour < 16 and len(df) and df.index[-1].date() >= now.date():
         return df[df.index.date < now.date()]
     return df
-
-
+ 
+ 
 def download_fresh(names):
     import yfinance as yf
-
+ 
     def get(ticker):
         df = yf.download(ticker, start="2012-01-01", auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
@@ -63,8 +64,8 @@ def download_fresh(names):
         except Exception as e:
             print(f"  {n}: skipped ({e})")
     return raws, get("^NSEI").Close
-
-
+ 
+ 
 def live_frame(raws, nifty):
     """Same features as Version 2, kept for ALL dates (labels are NaN for the newest rows)."""
     parts = {}
@@ -87,8 +88,8 @@ def live_frame(raws, nifty):
         big[c] = mk[c].values
     use = ["r_" + c for c in stock_cols] + list(mk.columns) + ["breadth50", "breadth_ret20"]
     return big, use
-
-
+ 
+ 
 def make_signal(raws, nifty):
     big, use = live_frame(raws, nifty)
     counts = big.groupby(level=0).stock.count()
@@ -114,8 +115,8 @@ def make_signal(raws, nifty):
         for rank, (st, sc, vr, mr) in enumerate(zip(top.stock, top[c], top.vol_rank, top.mom_rank), 1):
             rows.append((signal_date, c, st, rank, sc, vr, mr))
     return signal_date, pd.DataFrame(rows, columns=["signal_date", "model", "stock", "rank", "score", "vol_rank", "mom_rank"])
-
-
+ 
+ 
 def run_signal():
     """Returns ("not_due", days_left) or ("done", (signal_date, picks))."""
     PAPER.mkdir(exist_ok=True)
@@ -130,8 +131,8 @@ def run_signal():
     led = pd.concat([led, picks]) if LEDGER.exists() else picks
     led.to_csv(LEDGER, index=False)
     return "done", (date, picks)
-
-
+ 
+ 
 def cmd_signal():
     print("Refreshing data ...")
     status, res = run_signal()
@@ -142,8 +143,8 @@ def cmd_signal():
     print(f"Signal date {date.date()}. Buy at the NEXT trading day's open. Picks saved to {LEDGER}\n")
     for name, col in MODELS:
         print(f"{name}: " + ", ".join(picks[picks.model == col].stock))
-
-
+ 
+ 
 def score_ledger(led, raws):
     rows, detail, prev = [], [], {}
     for date, g in led.groupby("signal_date"):
@@ -172,8 +173,8 @@ def score_ledger(led, raws):
             prev[col] = set(names)
         rows.append(row)
     return pd.DataFrame(rows), pd.DataFrame(detail)
-
-
+ 
+ 
 def run_score():
     """Scores finished periods, saves paper/score.csv and paper/detail.csv. Returns (score, detail) or None."""
     if not LEDGER.exists():
@@ -186,8 +187,8 @@ def run_score():
     sc.to_csv(SCORE, index=False)
     detail.to_csv(PAPER / "detail.csv", index=False)
     return sc, detail
-
-
+ 
+ 
 def cmd_score():
     res = run_score()
     if res is None:
@@ -204,8 +205,9 @@ def cmd_score():
               f"beat the universe in {100 * (x > 0).mean():.0f}% of periods")
     if n < 24:
         print("Too few periods to say anything. A good or bad run now is mostly luck.")
-
-
+ 
+ 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     {"signal": cmd_signal, "score": cmd_score}.get(cmd, lambda: print("Use: python src/paper.py signal | score"))()
+ 
